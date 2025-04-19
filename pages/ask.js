@@ -1,37 +1,64 @@
-// pages/api/ask.js
+// pages/ask.js
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+import { useState } from 'react';
 
-  const { prompt } = req.body;
+export default function AskPage() {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-      }),
-    });
+  const handleAsk = async () => {
+    setLoading(true);
+    setAnswer('');
+    setError('');
 
-    // Check if the response was OK
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
-      return res.status(response.status).json({ error: 'Failed to fetch from OpenAI' });
+    try {
+      const res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: question }),
+      });
+
+      if (!res.ok) {
+        const errorRes = await res.json();
+        throw new Error(errorRes.error || 'Unknown error');
+      }
+
+      const data = await res.json();
+      setAnswer(data.answer);
+    } catch (err) {
+      console.error('❌ Client error:', err.message);
+      setError(err.message);
     }
 
-    const data = await response.json();
-    const answer = data?.choices?.[0]?.message?.content || 'No answer received.';
+    setLoading(false);
+  };
 
-    return res.status(200).json({ answer });
-  } catch (err) {
-    console.error('❌ Unexpected error in /api/ask:', err);
-    return res.status(500).json({ error: 'Unexpected server error' });
-  }
+  return (
+    <div style={{ padding: '2rem', maxWidth: '600px', margin: 'auto', fontFamily: 'sans-serif' }}>
+      <h1>💬 Ask the Assistant</h1>
+
+      <textarea
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        rows={5}
+        style={{ width: '100%', padding: '1rem', marginBottom: '1rem' }}
+        placeholder="Ask me anything about your products..."
+      />
+
+      <button onClick={handleAsk} disabled={loading} style={{ padding: '0.75rem 1.5rem' }}>
+        {loading ? '⏳ Asking...' : 'Ask GPT'}
+      </button>
+
+      {error && <p style={{ color: 'red', marginTop: '1rem' }}>⚠️ {error}</p>}
+
+      {answer && (
+        <div style={{ marginTop: '2rem', background: '#f0f0f0', padding: '1rem', borderRadius: '8px' }}>
+          <strong>Assistant:</strong>
+          <p>{answer}</p>
+        </div>
+      )}
+    </div>
+  );
 }
