@@ -19,12 +19,19 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await response.json();
-    const answer = data.choices?.[0]?.message?.content || 'No answer received.';
+    // Check if the response was OK
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
+      return res.status(response.status).json({ error: 'Failed to fetch from OpenAI' });
+    }
 
-    res.status(200).json({ answer });
+    const data = await response.json();
+    const answer = data?.choices?.[0]?.message?.content || 'No answer received.';
+
+    return res.status(200).json({ answer });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'OpenAI request failed' });
+    console.error('❌ Unexpected error in /api/ask:', err);
+    return res.status(500).json({ error: 'Unexpected server error' });
   }
 }
